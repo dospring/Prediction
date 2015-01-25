@@ -1,0 +1,98 @@
+---
+title: "Predicting for Coursera - Practical Machine Learning"
+output: html_document
+---
+
+Dividing Data into Training and Testing Data. Due to computation time, only a fraction of all data will be used.
+
+```{r warning=FALSE}
+dataLoad <- read.csv("pml-training.csv")
+library("caret")
+
+set.seed(721)
+data <- dataLoad[createDataPartition(dataLoad$classe, p=0.04, list=FALSE),]
+set.seed(1500)
+testingData <- dataLoad[createDataPartition(dataLoad$classe, p=0.04, list=FALSE),]
+
+```
+
+## 1. Description of the outcome variable
+```{r}
+summary(dataLoad$classe)
+```
+
+
+Searching for important predictor variables by investigating the correlation matrix
+```{r warning=FALSE}
+cor.Matrix <- rep(NA, times=159)
+cor.Matrix.sig <- rep(NA, times=159)
+classeA <- ifelse(dataLoad$class=="A", 1, 0)
+for (i in 8:159) {
+cor.Matrix[i] <- ifelse(class(dataLoad[,i])=="factor", NA, cor(dataLoad[,i], classeA))
+cor.Matrix.sig[i] <- ifelse(class(dataLoad[,i])=="factor", NA, ifelse(cor(dataLoad[,i], classeA)>0.02, round(cor(dataLoad[,i], classeA), digits=2),  "small"))
+}
+
+```
+
+Important variables are contained in the following columns: 42, 44, 45, 47, 49, 64, 67, 68, 102, 154, 157, 158
+
+## Random Forest
+As there are more than two outcomes, I will try using Random forests.
+
+```{r warning=FALSE}
+library(randomForest)
+
+
+
+trainRF <- train(data$classe ~ ., data=data[, c(42, 44, 45, 47, 49, 64, 67, 68, 102, 154, 157, 158, 160)], method="rf", prox=TRUE)
+
+
+predRF <- predict(trainRF, data)
+table(predRF, data$classe)
+```
+
+
+
+Misclassification error:
+
+`r 1-sum(diag(matrix(table(predRF, data$classe), nrow=5, ncol=5)))/sum(matrix(table(predRF, data$classe), nrow=5, ncol=5)) `
+
+## Linear Discrimination
+As an alternative I will try linear discriminant analysis
+
+```{r}
+
+trainLDA <- train(data$classe ~ ., data=data[, c(42, 44, 45, 47, 49, 64, 67, 68, 102, 154, 157, 158, 160)], method="lda", prox=TRUE)
+
+predLDA <- predict(trainLDA, data)
+table(predLDA, data$classe)
+```
+
+
+
+Misclassification error:
+`r 1-sum(diag(matrix(table(predLDA, data$classe), nrow=5, ncol=5)))/sum(matrix(table(predLDA, data$classe), nrow=5, ncol=5)) `
+
+As the Error (in the subsample) is higher for the Linear Discriminant analysis. I´d use the Random Forest algorithm. Of course the true error would be higher for real data, but the classification is pretty successful. As a better estimation of the true estimation error, it can be calculated based on the testingData:
+
+```{r}
+predRF <- predict(trainRF, testingData)
+table(predRF, testingData$classe)
+1-sum(diag(matrix(table(predRF, data$classe), nrow=5, ncol=5)))/sum(matrix(table(predRF, data$classe), nrow=5, ncol=5))
+
+
+predLDA <- predict(trainLDA, testingData)
+table(predLDA, testingData$classe)
+1-sum(diag(matrix(table(predLDA, data$classe), nrow=5, ncol=5)))/sum(matrix(table(predLDA, data$classe), nrow=5, ncol=5))
+```
+
+## Prediction for 20 cases
+Finally: Predicting the 20 cases from the testing-File:
+
+```{r}
+TestData <- read.csv("pml-testing.csv")
+
+finalprediction <- predict(trainRF, TestData)
+print(finalprediction)
+```
+
